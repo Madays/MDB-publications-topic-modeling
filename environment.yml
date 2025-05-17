@@ -1,0 +1,8 @@
+name: topic-model-env
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+    - gensim
+    - nltk
+    - spacy
