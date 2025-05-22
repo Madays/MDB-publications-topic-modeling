@@ -1,4 +1,43 @@
 import requests
+"""
+This script downloads and saves raw data from the World Bank API based on a list of taxonomy search terms.
+
+Modules:
+    - requests: For making HTTP requests to the World Bank API.
+    - pandas: For handling and saving tabular data.
+    - os: For file and directory operations.
+    - json: For reading and writing JSON files.
+    - taxonomy: Imports ALL_TAXONOMY_TERMS, a list of search terms.
+
+Constants:
+    - API_URL: Base URL for the World Bank API.
+    - CORE_FIELDS: List of fields to extract and save from each document.
+
+Functions:
+    - download_worldbank_data(query, format='json', rows='558893', lang_exact='English', fl=..., strdate="2017-01-01", enddate="2025-05-16"):
+        Downloads data from the World Bank API for a given query and returns the JSON response.
+        Raises an exception if the request fails or the response cannot be parsed as JSON.
+
+    - save_raw_data_to_json(data, filename, query):
+        Saves the raw API response to a JSON file, appending each new query and its response as an entry in a list.
+
+    - flatten_document(doc, query):
+        Flattens a single document from the API response into a dictionary with selected fields for easier tabular storage.
+
+    - save_raw_data_to_csv(data, filename, query=None):
+        Converts the API response into a flat tabular format and appends it to a CSV file.
+
+Main Execution:
+    - Initializes empty JSON and CSV files for storing results.
+    - Iterates over all taxonomy terms, downloads data for each, and saves both the raw JSON and flattened CSV data.
+
+Usage:
+    Run this script directly to download and save World Bank documents for all taxonomy terms defined in taxonomy.ALL_TAXONOMY_TERMS.
+
+Note:
+    - The script expects the taxonomy module with ALL_TAXONOMY_TERMS to be available.
+    - Output files are saved in the 'data/raw/' directory.
+"""
 import pandas as pd
 import os
 import json
@@ -6,20 +45,26 @@ import json
 # List of search terms
 from taxonomy import ALL_TAXONOMY_TERMS
 
-API_URL = "https://search.worldbank.org/api/v3/wds"
+#https://search.worldbank.org/api/v3/wds?format=json&qterm=agriculture,%20fishing%20and%20forestry&lang_exact=English&fl=abstracts,display_title,keywd,subtopic,teratopic,historic_topic&rows=558893
+API_URL = "https://search.worldbank.org/api/v3/wds?"
 
-CORE_FIELDS = [
+"""CORE_FIELDS = [
     "id", "display_title", "abstract", "language", "country", "region",
     "doc_type", "major_doc_type", "doc_date", "disclosure_date",
     "keywords", "authors", "sectors", "subsector", "themes",
     "topics", "historic_topics", "pdf_url", "txt_url", "url", "query"
+]"""
+CORE_FIELDS = [
+    "id", "display_title", "abstract", "language", "keywords", "topics", "historic_topics", "query"
 ]
 
-def download_worldbank_data(query, format='json', rows='558893', strdate="2017-01-01", enddate="2025-05-16"):
+def download_worldbank_data(query, format='json', rows='558893', lang_exact='English', fl='abstracts,display_title,keywd,subtopic,teratopic,historic_topic,lang',strdate="2017-01-01", enddate="2025-05-16"):
     params = {
         "qterm": query,
         "format": format,
-        "rows": rows,
+        "lang_exact": lang_exact,
+        "rows": rows,        
+        "fl": fl,
         "strdate": strdate,
         "enddate": enddate
     }
@@ -59,22 +104,22 @@ def flatten_document(doc, query):
         "display_title": doc.get("display_title", ""),
         "abstract": doc.get("abstracts", {}).get("cdata!", ""),
         "language": doc.get("lang", ""),
-        "country": doc.get("count", ""),
-        "region": doc.get("admreg", ""),
-        "doc_type": doc.get("docty", ""),
-        "major_doc_type": doc.get("majdocty", ""),
-        "doc_date": doc.get("docdt", ""),
-        "disclosure_date": doc.get("disclosure_date", ""),
+        #"country": doc.get("count", ""),
+        #"region": doc.get("admreg", ""),
+        #"doc_type": doc.get("docty", ""),
+        #"major_doc_type": doc.get("majdocty", ""),
+        #"doc_date": doc.get("docdt", ""),
+        #"disclosure_date": doc.get("disclosure_date", ""),
         "keywords": join_nested(doc.get("keywd", {}), "keywd"),
-        "authors": join_nested(doc.get("authors", {}), "author"),
-        "sectors": join_nested(doc.get("sectr", {}), "sector"),
-        "subsector": doc.get("subsc", ""),
-        "themes": doc.get("theme", ""),
+        #"authors": join_nested(doc.get("authors", {}), "author"),
+        #"sectors": join_nested(doc.get("sectr", {}), "sector"),
+        #"subsector": doc.get("subsc", ""),
+        #"themes": doc.get("theme", ""),
         "topics": doc.get("subtopic", ""),
         "historic_topics": doc.get("historic_topic", ""),
-        "pdf_url": doc.get("pdfurl", ""),
-        "txt_url": doc.get("txturl", ""),
-        "url": doc.get("url", ""),
+        #"pdf_url": doc.get("pdfurl", ""),
+        #"txt_url": doc.get("txturl", ""),
+        #"url": doc.get("url", ""),
         "query": query
     }
     return flat
@@ -92,7 +137,7 @@ def save_raw_data_to_csv(data, filename, query=None):
     df.to_csv(filename, mode="a", header=write_header, index=False)
 
 if __name__ == "__main__":
-    json_path = "data/raw/worldbank_documents.json"
+    json_path = "data/raw/worldbank_documents.js"
     csv_path = "data/raw/worldbank_documents.csv"
     os.makedirs(os.path.dirname(json_path), exist_ok=True)
     with open(json_path, "w") as f:
