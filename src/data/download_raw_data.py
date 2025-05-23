@@ -80,6 +80,13 @@ def download_worldbank_data(query, format='json', rows='558893', lang_exact='Eng
 
 def save_raw_data_to_json(data, filename, query):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
+    # Filter data to include only documents with 'abstracts' property
+    if "documents" in data and isinstance(data["documents"], dict):
+        filtered_docs = {
+            k: v for k, v in data["documents"].items()
+            if "abstracts" in v and len(v["abstracts"].get("cdata!", "")) > 300
+        }
+        data = {**data, "documents": filtered_docs}
     entry = {"query": query, "response": data}
     if os.path.exists(filename):
         with open(filename, "r") as json_file:
@@ -131,7 +138,11 @@ def save_raw_data_to_csv(data, filename, query=None):
         print("No documents found in data.")
         return
 
-    rows = [flatten_document(doc, query) for doc in documents.values()]
+    rows = [
+        flatten_document(doc, query)
+        for doc in documents.values()
+        if 'abstracts' in doc and len(doc['abstracts'].get('cdata!', "")) > 300
+    ]
     df = pd.DataFrame(rows, columns=CORE_FIELDS)
     write_header = not os.path.exists(filename)
     df.to_csv(filename, mode="a", header=write_header, index=False)
