@@ -71,8 +71,15 @@ def download_worldbank_data(
 
     all_docs = {}
     offset= 0
+    previous_offset = -1  # To catch accidental reset
+    
     while offset < max_records:
         print(f"Requesting offset {offset}...")
+
+        if offset == previous_offset:
+            print("Offset repeated — stopping to prevent infinite loop.")
+            break
+        
         params = {
             "qterm": query,
             "format": format,
@@ -83,6 +90,7 @@ def download_worldbank_data(
             "strdate": strdate,
             "enddate": enddate
         }
+
         response = requests.get(API_URL, params=params)
         if response.status_code == 200:
             try:
@@ -92,7 +100,6 @@ def download_worldbank_data(
                 raise Exception("Failed to parse JSON response")
         else:
             raise Exception(f"Failed to fetch data: {response.status_code}, Response: {response.text}")
-        
         
 
         docs = {k: v for k, v in data.get("documents", {}).items() if k != "facets"}
@@ -112,6 +119,7 @@ def download_worldbank_data(
         progress = (len(all_docs) / max_records) * 100
         print(f"Downloaded {len(all_docs)} documents... ({progress:.2f}%)")
 
+        previous_offset = offset
         offset += rows_per_page
         time.sleep(1)  # Pause between requests (good API etiquette)
     return {"documents": all_docs}
