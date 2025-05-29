@@ -1,4 +1,5 @@
-from pip._vendor import requests
+#from pip._vendor 
+import requests
 """
 This script downloads and saves raw data from the World Bank API based on a list of taxonomy search terms.
 
