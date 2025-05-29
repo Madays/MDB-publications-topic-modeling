@@ -7,7 +7,7 @@ interim_dir = "data/interim"
 output_path = os.path.join(interim_dir, "stratified_sample.csv")
 
 # Parameters
-n_per_query = 200  # Number of documents per query group (or less if not available)
+n_per_query = 50  # Number of documents per query group (or less if not available)
 
 # Create output directory if needed
 os.makedirs(interim_dir, exist_ok=True)
