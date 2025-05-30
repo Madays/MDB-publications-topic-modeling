@@ -1,3 +1,4 @@
+#from pip._vendor 
 import requests
 """
 This script downloads and saves raw data from the World Bank API based on a list of taxonomy search terms.
@@ -41,10 +42,11 @@ Note:
 import pandas as pd
 import os
 import json
-
+import time  # optional, to avoid hitting the API too fast
 # List of search terms
-from taxonomy import ALL_TAXONOMY_TERMS
+from topics import ALL_TAXONOMY_TERMS
 
+total_terms = len(ALL_TAXONOMY_TERMS)
 #https://search.worldbank.org/api/v3/wds?format=json&qterm=agriculture,%20fishing%20and%20forestry&lang_exact=English&fl=abstracts,display_title,keywd,subtopic,teratopic,historic_topic&rows=558893
 API_URL = "https://search.worldbank.org/api/v3/wds?"
 
@@ -58,25 +60,79 @@ CORE_FIELDS = [
     "id", "display_title", "abstract", "language", "keywords", "topics", "historic_topics", "query"
 ]
 
-def download_worldbank_data(query, format='json', rows='558893', lang_exact='English', fl='abstracts,display_title,keywd,subtopic,teratopic,historic_topic,lang',strdate="2017-01-01", enddate="2025-05-16"):
-    params = {
-        "qterm": query,
-        "format": format,
-        "lang_exact": lang_exact,
-        "rows": rows,        
-        "fl": fl,
-        "strdate": strdate,
-        "enddate": enddate
-    }
-    response = requests.get(API_URL, params=params)
-    if response.status_code == 200:
-        try:
-            return response.json()
-        except requests.exceptions.JSONDecodeError:
-            print("Response content:", response.text)
-            raise Exception("Failed to parse JSON response")
-    else:
-        raise Exception(f"Failed to fetch data: {response.status_code}, Response: {response.text}")
+def download_worldbank_data(
+        query, 
+        format='json', 
+        rows_per_page=1000, 
+        lang_exact='English', 
+        fl='abstracts,display_title,keywd,subtopic,teratopic,historic_topic,lang',
+        strdate="2017-01-01", 
+        enddate="2025-05-16",
+        max_records=10000
+    ):
+
+    all_docs = {}
+    offset= 0
+    previous_offset = -1  # To catch accidental reset
+    
+    while offset < max_records:
+        #what slice of results you're asking for
+        print(f"Requesting offset {offset}...")
+
+        if offset == previous_offset:
+            print("Offset repeated — stopping to prevent infinite loop.")
+            break
+
+        params = {
+            "qterm": query,
+            "format": format,
+            "lang_exact": lang_exact,
+            "rows": rows_per_page,
+            "os": offset,        
+            "fl": fl,
+            "strdate": strdate,
+            "enddate": enddate
+        }
+
+        response = requests.get(API_URL, params=params)
+        if response.status_code == 200:
+            try:
+                #Store the parsed JSON
+                data = response.json()
+            except requests.exceptions.JSONDecodeError:
+                print("Response content:", response.text)
+                raise Exception("Failed to parse JSON response")
+        else:
+            raise Exception(f"Failed to fetch data: {response.status_code}, Response: {response.text}")
+        
+        #dictionary comprehension: Pulls all key–value pairs from the "documents" object in the API response and excludes the "facets" entry, which is not a document, but just metadata
+        docs = {k: v for k, v in data.get("documents", {}).items() if k != "facets"}
+        if not docs:
+            print("No more documents found.")
+            break
+        
+        previous_count = len(all_docs)
+        #adds all the documents from the current batch into the larger dictionary
+        all_docs.update(docs)
+
+        # 💡 Detect infinite loop
+        if len(all_docs) == previous_count:
+            print("No new documents added — stopping to prevent infinite loop.")
+            break
+
+        # ✅ Calculate progress for each term
+        progress = (len(all_docs) / max_records) * 100
+        print(f"Downloaded {len(all_docs)} documents... ({progress:.2f}%)")
+
+        #Track previous_offset to catch re-loops
+        previous_offset = offset
+        # Move to next batch
+        offset += rows_per_page
+
+        # Pause between requests (good API etiquette)
+        time.sleep(1)  
+    return {"documents": all_docs}
+    
 
 def save_raw_data_to_json(data, filename, query):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -155,7 +211,11 @@ if __name__ == "__main__":
         f.write("[]")
     if os.path.exists(csv_path):
         os.remove(csv_path)
-    for query in ALL_TAXONOMY_TERMS:
-        raw_data = download_worldbank_data(query)
-        save_raw_data_to_json(raw_data, json_path, query)
-        save_raw_data_to_csv(raw_data, csv_path, query)
+    for i, term in enumerate(ALL_TAXONOMY_TERMS, 1):
+        #Track total progress 
+        print(f"\n[{i}/{total_terms}] Fetching data for: {term}")
+        raw_data = download_worldbank_data(query=term)
+        save_raw_data_to_json(raw_data, json_path, query=term)
+        save_raw_data_to_csv(raw_data, csv_path, query=term)
+    
+        
