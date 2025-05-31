@@ -1,5 +1,3 @@
-#from pip._vendor 
-import requests
 """
 This script downloads and saves raw data from the World Bank API based on a list of taxonomy search terms.
 
@@ -39,12 +37,20 @@ Note:
     - The script expects the taxonomy module with ALL_TAXONOMY_TERMS to be available.
     - Output files are saved in the 'data/raw/' directory.
 """
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import pandas as pd
 import os
 import json
 import time  # optional, to avoid hitting the API too fast
 # List of search terms
 from topics import ALL_TAXONOMY_TERMS
+
+# Set up requests session with retry strategy
+session = requests.Session()
+retries = Retry(total=5, backoff_factor=2, status_forcelist=[502, 503, 504, 429])
+session.mount('https://', HTTPAdapter(max_retries=retries))
 
 total_terms = len(ALL_TAXONOMY_TERMS)
 #https://search.worldbank.org/api/v3/wds?format=json&qterm=agriculture,%20fishing%20and%20forestry&lang_exact=English&fl=abstracts,display_title,keywd,subtopic,teratopic,historic_topic&rows=558893
@@ -57,7 +63,7 @@ API_URL = "https://search.worldbank.org/api/v3/wds?"
     "topics", "historic_topics", "pdf_url", "txt_url", "url", "query"
 ]"""
 CORE_FIELDS = [
-    "id", "display_title", "abstract", "language", "keywords", "topics", "historic_topics", "query"
+    "id", "query", "display_title", "abstract", "language", "country", "region", "doc_type","disclosure_date", "keywords","sectors", "subtopic", "historic_topics", "pdf_url"
 ]
 
 def download_worldbank_data(
@@ -94,7 +100,7 @@ def download_worldbank_data(
             "enddate": enddate
         }
 
-        response = requests.get(API_URL, params=params)
+        response = session.get(API_URL, params=params)
         if response.status_code == 200:
             try:
                 #Store the parsed JSON
@@ -164,26 +170,27 @@ def flatten_document(doc, query):
 
     flat = {
         "id": doc.get("id", ""),
+        "query": query,
         "display_title": doc.get("display_title", ""),
         "abstract": doc.get("abstracts", {}).get("cdata!", ""),
         "language": doc.get("lang", ""),
-        #"country": doc.get("count", ""),
-        #"region": doc.get("admreg", ""),
-        #"doc_type": doc.get("docty", ""),
+        "country": doc.get("count", ""),
+        "region": doc.get("admreg", ""),
+        "doc_type": doc.get("docty", ""),
         #"major_doc_type": doc.get("majdocty", ""),
         #"doc_date": doc.get("docdt", ""),
-        #"disclosure_date": doc.get("disclosure_date", ""),
+        "disclosure_date": doc.get("disclosure_date", ""),
         "keywords": join_nested(doc.get("keywd", {}), "keywd"),
         #"authors": join_nested(doc.get("authors", {}), "author"),
-        #"sectors": join_nested(doc.get("sectr", {}), "sector"),
+        "sectors": join_nested(doc.get("sectr", {}), "sector"),
         #"subsector": doc.get("subsc", ""),
-        #"themes": doc.get("theme", ""),
-        "topics": doc.get("subtopic", ""),
+        "themes": doc.get("theme", ""),
+        "subtopic": doc.get("subtopic", ""),
         "historic_topics": doc.get("historic_topic", ""),
-        #"pdf_url": doc.get("pdfurl", ""),
+        "pdf_url": doc.get("pdfurl", ""),
         #"txt_url": doc.get("txturl", ""),
         #"url": doc.get("url", ""),
-        "query": query
+        
     }
     return flat
 
@@ -217,5 +224,4 @@ if __name__ == "__main__":
         raw_data = download_worldbank_data(query=term)
         save_raw_data_to_json(raw_data, json_path, query=term)
         save_raw_data_to_csv(raw_data, csv_path, query=term)
-    
-        
+
