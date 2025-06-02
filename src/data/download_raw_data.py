@@ -211,13 +211,7 @@ def save_raw_data_to_csv(data, filename, query=None):
     df.to_csv(filename, mode="a", header=write_header, index=False)
 
 if __name__ == "__main__":
-    json_path = "data/raw/worldbank_documents.js"
-    csv_path = "data/raw/worldbank_documents.csv"
-    os.makedirs(os.path.dirname(json_path), exist_ok=True)
-    with open(json_path, "w") as f:
-        f.write("[]")
-    if os.path.exists(csv_path):
-        os.remove(csv_path)
+    csv_path = "data/interim/stratified_sample.csv"
     for i, term in enumerate(ALL_TAXONOMY_TERMS, 1):
         #Track total progress 
         print(f"\n[{i}/{total_terms}] Fetching data for: {term}")
