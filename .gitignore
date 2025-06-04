@@ -172,3 +172,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+/data/raw/worldbank_documents.js
+/data/raw/worldbank_documents.csv
