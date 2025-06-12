@@ -39,6 +39,7 @@ Note:
 """
 import requests
 from requests.adapters import HTTPAdapter
+from requests.exceptions import ChunkedEncodingError
 from urllib3.util.retry import Retry
 import pandas as pd
 import os
@@ -54,6 +55,7 @@ session.mount('https://', HTTPAdapter(max_retries=retries))
 
 total_terms = len(ALL_TAXONOMY_TERMS)
 #https://search.worldbank.org/api/v3/wds?format=json&qterm=agriculture,%20fishing%20and%20forestry&lang_exact=English&fl=abstracts,display_title,keywd,subtopic,teratopic,historic_topic&rows=558893
+# example of facets https://search.worldbank.org/api/v3/wds?format=json&fct=sectr_exact,count_exact,lang_exact&rows=10&count_exact=Russian%20Federation%5eArmenia&lang_exact=Russian%5eFrench
 API_URL = "https://search.worldbank.org/api/v3/wds?"
 
 """CORE_FIELDS = [
@@ -63,15 +65,15 @@ API_URL = "https://search.worldbank.org/api/v3/wds?"
     "topics", "historic_topics", "pdf_url", "txt_url", "url", "query"
 ]"""
 CORE_FIELDS = [
-    "id", "query", "display_title", "abstract", "language", "country", "region", "doc_type","disclosure_date", "keywords","sectors", "subtopic", "historic_topics", "pdf_url"
+    "id", "query", "display_title", "abstract", "language", "country", "region", "doc_type","disclosure_date", "keywords","theme", "subtopic", "historic_topics", "pdf_url"
 ]
 
 def download_worldbank_data(
         query, 
         format='json', 
-        rows_per_page=1000, 
+        rows_per_page=500, 
         lang_exact='English', 
-        fl='abstracts,display_title,keywd,subtopic,teratopic,historic_topic,lang',
+        fl='display_title,abstracts,lang,count,admreg,docty,disclosure_date,keywd,theme,subtopic,historic_topic,pdfurl',
         strdate="2017-01-01", 
         enddate="2025-05-16",
         max_records=10000
@@ -100,7 +102,17 @@ def download_worldbank_data(
             "enddate": enddate
         }
 
-        response = session.get(API_URL, params=params)
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                response = session.get(API_URL, params=params, timeout=60)
+                break  # Success!
+            except ChunkedEncodingError as e:
+                print(f"ChunkedEncodingError: {e}. Retrying ({attempt+1}/{max_attempts})...")
+                time.sleep(2)
+        else:
+            raise Exception("Failed after multiple attempts due to ChunkedEncodingError")
+        
         if response.status_code == 200:
             try:
                 #Store the parsed JSON
@@ -182,9 +194,9 @@ def flatten_document(doc, query):
         "disclosure_date": doc.get("disclosure_date", ""),
         "keywords": join_nested(doc.get("keywd", {}), "keywd"),
         #"authors": join_nested(doc.get("authors", {}), "author"),
-        "sectors": join_nested(doc.get("sectr", {}), "sector"),
+        #"sectors": join_nested(doc.get("sectr_exact", {}), "sectr_exact"),
         #"subsector": doc.get("subsc", ""),
-        "themes": doc.get("theme", ""),
+        "theme": doc.get("theme", ""),
         "subtopic": doc.get("subtopic", ""),
         "historic_topics": doc.get("historic_topic", ""),
         "pdf_url": doc.get("pdfurl", ""),
