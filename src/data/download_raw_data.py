@@ -25,7 +25,7 @@ def download_worldbank_data(query, format='json', rows_per_page=500, lang_exact=
                              strdate="2017-01-01", enddate="2025-05-16", max_records=10000):
     all_docs = {}
     offset = 0
-    previous_offset = -1
+    previous_offset = -1 # To catch accidental reset
 
     while offset < max_records:
         print(f"Requesting offset {offset}...")
@@ -61,15 +61,19 @@ def download_worldbank_data(query, format='json', rows_per_page=500, lang_exact=
                 raise Exception("Failed to parse JSON response")
         else:
             raise Exception(f"Failed to fetch data: {response.status_code}, Response: {response.text}")
-
+        #dictionary comprehension: Pulls all key–value pairs from the "documents" object in the API response and excludes the "facets" entry, which is not a document, but just metadata
         docs = {k: v for k, v in data.get("documents", {}).items() if k != "facets"}
         if not docs:
+            print("No more documents found.")
             break
 
         previous_count = len(all_docs)
+        #adds all the documents from the current batch into the larger dictionary
         all_docs.update(docs)
 
+        # 💡 Detect infinite loop
         if len(all_docs) == previous_count:
+            print("No new documents added — stopping to prevent infinite loop.")
             break
 
         previous_offset = offset
