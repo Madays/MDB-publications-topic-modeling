@@ -26,7 +26,7 @@ def download_worldbank_data(query, format='json', rows_per_page=500, lang_exact=
     all_docs = {}
     offset = 0
     previous_offset = -1 # To catch accidental reset
-
+    
     while offset < max_records:
         print(f"Requesting offset {offset}...")
         if offset == previous_offset:
@@ -80,21 +80,20 @@ def download_worldbank_data(query, format='json', rows_per_page=500, lang_exact=
         offset += rows_per_page
         time.sleep(1)
 
-    return {"documents": all_docs}
+    if offset >= max_records or not docs:           
+        return {"documents": all_docs}
 
 def save_raw_data_to_json(data, filename, query):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    entry = {"query": query, "response": {"documents": data}}
-
-    existing_data = []
+    existing_data = {}
     if os.path.exists(filename):
         with open(filename, "r") as f:
             try:
                 existing_data = json.load(f)
             except json.JSONDecodeError:
                 pass
-
-    existing_data.append(entry)
+    
+    existing_data[query] = data
     with open(filename, "w") as f:
         json.dump(existing_data, f, indent=4)
 
