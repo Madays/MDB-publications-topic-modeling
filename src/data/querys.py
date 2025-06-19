@@ -1,5 +1,6 @@
 
-ALL_TAXONOMY_TERMS = ['Agriculture & Rural Development',
+ALL_TAXONOMY_TERMS = [
+    'Agriculture & Rural Development',
 'Aid Effectiveness',
 'Economy & Growth',
 'Education',
